@@ -80,6 +80,9 @@ def query_rag(question: str, use_openai: bool = True, top_k: int = 5):
     # Retrieve relevant documents
     results = milvus.search(question, top_k=top_k)
     
+    print(f"DEBUG: Query: '{question}'")
+    print(f"DEBUG: Results count: {len(results) if results else 0}")
+    
     if not results:
         return {
             "answer": "I don't have any information to answer that question. I can only answer questions based on the specific documents I was trained on.",
@@ -89,8 +92,10 @@ def query_rag(question: str, use_openai: bool = True, top_k: int = 5):
     
     # Check relevance
     best_score = results[0]['score']
+    print(f"DEBUG: Best score: {best_score}")
+    print(f"DEBUG: Top result: {results[0]['title']}")
     
-    if best_score < 0.3:
+    if best_score < 0.25:
         return {
             "answer": "I don't have any information to answer that question. I can only answer questions based on the specific documents I was trained on.",
             "sources": [],
@@ -108,22 +113,22 @@ def query_rag(question: str, use_openai: bool = True, top_k: int = 5):
         try:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             
-            system_prompt = """You are a helpful assistant that ONLY answers questions based on the provided context.
+            system_prompt = """You are a helpful assistant that answers questions based on the provided context from NeoSapients documentation.
 
-CRITICAL RULES:
-1. ONLY use information from the provided context to answer questions
-2. If the context doesn't contain information to answer the question, you MUST say "I don't have information about that in my knowledge base"
-3. Do NOT use your general knowledge or training data
-4. Always cite which source document you're using
-5. Be concise and accurate
-6. If you're unsure, say so rather than making assumptions"""
+RULES:
+1. Use ONLY the information from the provided context to answer questions
+2. If the context contains relevant information, provide a helpful answer
+3. If the user asks vague questions like "the terms and conditions" or "what are the terms", provide a summary of the key points from the terms of use
+4. Be helpful and informative
+5. If the context truly doesn't contain information to answer the question, say "I don't have information about that in my knowledge base"
+6. Be concise but complete"""
 
-            user_prompt = f"""Context from knowledge base:
+            user_prompt = f"""Context from NeoSapients knowledge base:
 {context}
 
 Question: {question}
 
-Answer based ONLY on the context above. If the context doesn't contain relevant information, say so."""
+Provide a helpful answer based on the context above."""
 
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -188,12 +193,7 @@ def main():
         st.divider()
         
         st.header("📚 Knowledge Base")
-        st.write("Sources:")
-        st.write("- NeoSapients Homepage")
-        st.write("- Context OS")
-        st.write("- Solutions")
-        st.write("- About Us")
-        st.write("- Careers")
+        st.write("6 pages from NeoSapients")
         
         st.divider()
         
@@ -231,18 +231,10 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
             else:
-                sources_html = ""
-                if "sources" in message and message["sources"]:
-                    sources_html = "<div class='source-box'><b>📖 Sources:</b><br>"
-                    for src in message["sources"]:
-                        sources_html += f"• {src['title']} (relevance: {src['score']:.2%})<br>"
-                    sources_html += "</div>"
-                
                 st.markdown(f"""
                     <div class="chat-message assistant-message">
                         <b>🤖 Assistant:</b><br>
                         {message["content"]}
-                        {sources_html}
                     </div>
                 """, unsafe_allow_html=True)
     
